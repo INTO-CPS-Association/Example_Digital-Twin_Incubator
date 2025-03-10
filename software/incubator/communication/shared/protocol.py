@@ -8,6 +8,7 @@ ROUTING_KEY_UPDATE_CLOSED_CTRL_PARAMS = "incubator.update.closed_loop_controller
 ROUTING_KEY_CONTROLLER = "incubator.record.controller.state"
 ROUTING_KEY_HEATER = "incubator.hardware.gpio.heater.on"
 ROUTING_KEY_FAN = "incubator.hardware.gpio.fan.on"
+ROUTING_KEY_PUMP = "incubator.hardware.gpio.pump.on"
 
 
 def convert_str_to_bool(body):

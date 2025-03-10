@@ -1,6 +1,7 @@
 import concurrent.futures
 import logging
 import time
+import board
 
 # Import parameters and shared stuff
 from incubator.communication.server.rabbitmq import Rabbitmq
@@ -15,9 +16,12 @@ class IncubatorDriver:
     def __init__(self,
                  heater,
                  fan,
+                 pump,
                  t1,
                  t2,
                  t3,
+                 humidity,
+                 co2,
                  rabbit_config,
                  simulate_actuation=True
                  ):
@@ -28,11 +32,13 @@ class IncubatorDriver:
 
         self.heater_queue_name = ""
         self.fan_queue_name = ""
+        self.pump_queue_name = ""
 
         # IO
         self.heater = heater
         self.fan = fan
-        self.temperature_sensor = (t1, t2, t3)
+        self.pump = pump
+        self.sensors = (t1, t2, t3, humidity, co2)
 
         # Safety
         self.simulate_actuation = simulate_actuation
@@ -45,6 +51,7 @@ class IncubatorDriver:
         self.logger.info("Connected.")
         self.fan_queue_name = self.rabbitmq.declare_local_queue(routing_key=ROUTING_KEY_FAN)
         self.heater_queue_name = self.rabbitmq.declare_local_queue(routing_key=ROUTING_KEY_HEATER)
+        self.pump_queue_name = self.rabbitmq.declare_local_queue(routing_key=ROUTING_KEY_PUMP)
 
     def cleanup(self):
         self.logger.debug("Cleaning up.")
@@ -81,6 +88,8 @@ class IncubatorDriver:
         self.logger.debug(f"Elapsed after get heat command: {time.time() - start}s")
         fan_cmd = self._try_read_fan_control()
         self.logger.debug(f"Elapsed after get fan command: {time.time() - start}s")
+        pump_cmd = self._try_read_pump_control()
+        self.logger.debug(f"Elapsed after get pump command: {time.time() - start}s")
 
         if heat_cmd is not None:
             self.logger.debug(f"Heat command: on={heat_cmd}")
@@ -90,6 +99,9 @@ class IncubatorDriver:
             self.logger.debug(f"Fan command: on={fan_cmd}")
             self._safe_set_actuator(self.fan, fan_cmd)
             self.logger.debug(f"Elapsed after set fan: {time.time() - start}s")
+        if pump_cmd is not None:
+            self._safe_set_actuator(self.pump, pump_cmd)
+            self.logger.debug(f"Elapsed after set pump: {time.time() - start}s")
 
     def _safe_set_actuator(self, gpio_led, on: bool):
         if on and gpio_led.is_lit:
@@ -111,7 +123,7 @@ class IncubatorDriver:
                 self.logger.info("Pretending to set actuator off.")
 
     def read_upload_state(self, start, exec_interval):
-        n_sensors = len(self.temperature_sensor)
+        n_sensors = len(self.sensors)
         readings = [None] * n_sensors
         timestamps = [None] * n_sensors
 
@@ -120,7 +132,7 @@ class IncubatorDriver:
 
         # Use concurrency to read temp sensors in parallel.
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_sensors) as executor:
-            tasks = {executor.submit(self.temperature_sensor[i].read): i for i in range(n_sensors)}
+            tasks = {executor.submit(self.sensors[i].read): i for i in range(n_sensors)} 
             for task in concurrent.futures.as_completed(tasks):
                 i = tasks[task]
                 try:
@@ -150,6 +162,10 @@ class IncubatorDriver:
                 "t3": readings[2],
                 "time_t3": timestamps[2],
                 "average_temperature": (readings[0] + readings[1]) / 2,
+                "humidity": readings[3],
+                "time_humidity": timestamps[3],
+                "co2": readings[4],
+                "time_co2": timestamps[4],
                 "heater_on": self.heater.is_lit,
                 "fan_on": self.fan.is_lit,
                 "execution_interval": exec_interval,
@@ -175,10 +191,17 @@ class IncubatorDriver:
             return msg["fan"]
         else:
             return None
+        
+    def _try_read_pump_control(self):
+        msg = self.rabbitmq.get_message(self.heater_queue_name)
+        if msg is not None:
+            return msg["pump"]
+        else:
+            return None
 
 
 if __name__ == '__main__':
-    from incubator.physical_twin.sensor_actuator_layer import Heater, Fan, TemperatureSensor
+    from incubator.physical_twin.sensor_actuator_layer import Heater, Fan, TemperatureSensor, HumiditySensor, Pump, CO2Sensor
 
     config_logger("logging.conf")
     l = logging.getLogger("low_level_driver_server")
@@ -186,9 +209,12 @@ if __name__ == '__main__':
 
     incubator = IncubatorDriver(heater=Heater(12),
                                 fan=Fan(13),
+                                pump=Pump(16),
                                 t1=TemperatureSensor("/sys/bus/w1/devices/10-0008039ad4ee/w1_slave"),
                                 t2=TemperatureSensor("/sys/bus/w1/devices/10-0008039b25c1/w1_slave"),
                                 t3=TemperatureSensor("/sys/bus/w1/devices/10-0008039a977a/w1_slave"),
+                                humidity=HumiditySensor(board.D17),
+                                co2=CO2Sensor(),
                                 rabbit_config=config["rabbitmq"],
                                 simulate_actuation=False)
     while True:

@@ -6,6 +6,8 @@ This way we can test the low level driver ussing a local setup with rabbit mq, w
 from gpiozero import LED
 import re
 import time
+import adafruit_dht
+import mh_z19
 
 
 class Heater(LED):
@@ -16,6 +18,21 @@ class Heater(LED):
 class Fan(LED):
     def __init__(self, pin=None):
         super(Fan, self).__init__(pin=pin)
+
+class Pump(LED):
+    def __init__(self, pin=None):
+        super(Pump, self).__init__(pin=pin)
+
+class CO2Sensor:
+    def read(self):
+        return mh_z19.read()
+
+class HumiditySensor:
+    def __init__(self, path=None):
+        self.device = adafruit_dht.DHT22(path)
+    
+    def read(self):
+        return self.device.humidity
 
 
 class TemperatureSensor:
