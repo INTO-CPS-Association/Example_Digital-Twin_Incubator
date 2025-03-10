@@ -203,20 +203,24 @@ class IncubatorDriver:
 if __name__ == '__main__':
     from incubator.physical_twin.sensor_actuator_layer import Heater, Fan, TemperatureSensor, HumiditySensor, Pump, CO2Sensor
 
+    def startIncubatorDriver(heaterPath, fan_path, pump_path, t1_path, t2_path, t3_path, humidity_path):
+        IncubatorDriver(heater=Heater(heaterPath),
+                                fan=Fan(fan_path),
+                                pump=Pump(pump_path),
+                                t1=TemperatureSensor(t1_path),
+                                t2=TemperatureSensor(t2_path),
+                                t3=TemperatureSensor(t3_path),
+                                humidity=HumiditySensor(humidity_path),
+                                co2=CO2Sensor(),
+                                rabbit_config=config["rabbitmq"],
+                                simulate_actuation=False)
+
     config_logger("logging.conf")
     l = logging.getLogger("low_level_driver_server")
     config = load_config("startup.conf")
 
-    incubator = IncubatorDriver(heater=Heater(12),
-                                fan=Fan(13),
-                                pump=Pump(16),
-                                t1=TemperatureSensor("/sys/bus/w1/devices/10-0008039ad4ee/w1_slave"),
-                                t2=TemperatureSensor("/sys/bus/w1/devices/10-0008039b25c1/w1_slave"),
-                                t3=TemperatureSensor("/sys/bus/w1/devices/10-0008039a977a/w1_slave"),
-                                humidity=HumiditySensor(board.D17),
-                                co2=CO2Sensor(),
-                                rabbit_config=config["rabbitmq"],
-                                simulate_actuation=False)
+    incubator = startIncubatorDriver(**(config["physical_twin"]["low_level_driver"]))
+
     while True:
         try:
             incubator.setup()

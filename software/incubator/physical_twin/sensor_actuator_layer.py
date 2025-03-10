@@ -7,6 +7,7 @@ from gpiozero import LED
 import re
 import time
 import adafruit_dht
+import board
 import mh_z19
 
 
@@ -29,7 +30,8 @@ class CO2Sensor:
 
 class HumiditySensor:
     def __init__(self, path=None):
-        self.device = adafruit_dht.DHT22(path)
+        pin = getattr(board, f"D{path}") # Hack to convert pin number to adafruit board class
+        self.device = adafruit_dht.DHT22(pin)
     
     def read(self):
         return self.device.humidity
