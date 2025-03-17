@@ -204,7 +204,7 @@ if __name__ == '__main__':
     from incubator.physical_twin.sensor_actuator_layer import Heater, Fan, TemperatureSensor, HumiditySensor, Pump, CO2Sensor
 
     def startIncubatorDriver(heater_path, fan_path, pump_path, t1_path, t2_path, t3_path, humidity_path):
-        IncubatorDriver(heater=Heater(heater_path),
+        return IncubatorDriver(heater=Heater(heater_path),
                                 fan=Fan(fan_path),
                                 pump=Pump(pump_path),
                                 t1=TemperatureSensor(t1_path),
